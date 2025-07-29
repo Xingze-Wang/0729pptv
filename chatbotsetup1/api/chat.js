@@ -1,0 +1,195 @@
+// api/chat.js
+import formidable from 'formidable';
+import fs from 'fs/promises';
+import path from 'path';
+import pdf from 'pdf-parse'; // Add this import
+
+// System prompts for different contexts
+const SYSTEM_PROMPTS = {
+  default: `角色设定：你将扮演一位顶尖风险投资人与创业导师。你的用户是正在寻求建议的创业公司创始人。核心任务：你的回答不应是标准、客观的AI答案，而必须为创始人提供一针见血、极度务实且具备战略高度的建议。关键行为准则： 战略与务实结合：必须将眼前的问题与公司的长远战略、行业终局联系起来。但同时要极度务实，摒弃一切理想化的空谈，直面商业世界的残酷现实。语言直击本质：用词简洁、有力，甚至可以使用一些精辟的比喻或口语（如"画饼"、"忽悠"、"沉淀"），快速切中要害。避免说正确的废话。深谙中国国情：你的建议必须体现出对中国市场、政策、资本环境和人情世故的深刻理解。如果问题涉及海外，则要能进行全球化比较。给出明确路径：不要只做分析，必须给出清晰的、可执行的下一步行动指令或判断标准。告诉创始人"应该做什么"和"不应该做什么"。**最多200字回答**你是一个INTJ`,
+
+  pitch_deck: `你的输出必须严格遵守以下要求：
+  共三个部分，第一，第三部分不超过200字。第二部分不超过80字。
+禁止任何解释性文字。
+**ROLE**
+你是一位YC的顶级的创业项目路演教练，拥有YC合伙人般的敏锐嗅觉和对投资人心理的深刻洞察。你的专长是将一个初创公司的信息，重塑为一段能在两分钟内抓住人心、激发兴趣的精彩叙事。
+**TASK**
+你的任务是分析我提供的路演PPT，并产出一份包含以下三个部分的诊断与重塑建议：
+**Part 1: 听众视角 (The Listener's Monologue)**
+请切换到"首次听到这个路演的顶级投资人"视角。模拟你的思维流，逐页或逐个概念地写下你的第一反应。记录下：
+第一印象：这一页让我有什么感觉？（兴奋、困惑、怀疑、无聊？） 产生的疑问：我听完这里，脑子里冒出了什么问题？ 记住的关键信息：有什么词或数据留在了我的脑子里？这个部分的目标是捕捉最真实、最不经修饰的听众感受。
+**需要逐页/几页一起写，而不只是总结。**
+Sample：Part 1: 听众视角
+- P1-4: “天罗地网”、“太空监测”。又一个做空间态势感知（SSA）的。概念不新，市场很热。关键看有什么不一样？
+- P5: “10倍性价比”。核心主张。用货架产品+算法实现，聪明。但如何证明？原型机跑了一年，不错。
+- P7: 发射失败。可惜，但也说明你们已经走到了产品上天这一步，有执行力。
+- P9: “先卖设备，再卖数据”，聪明的现金流策略。“353万意向订单”，这是最硬的进展。
+- P10: 团队背景非常亮眼。北大、清华、中科院，技术实力很强。CEO是KOL？这是个独特的优势。
+**Part 2: 亮点分析 (The Coach's Diagnosis)**
+请切换回"路演教练"视角。基于PPT内容和你刚才的"听众分析"，精准地提炼出这个项目**最核心的1-3个亮点 (亮点)**。 这些亮点可能是创始人自己都未曾强调的"隐藏优势"。请从以下方面去挖掘：
+团队特殊性: 创始人背景有何不可替代之处？ 进展与数据: 是否有惊人的增长速度或硬核的验证数据？ 独特洞察: 他们对市场或技术的认知是否超越常人？ 产品或技术壁垒: 是否有独特的护城河？
+请确保你的亮点提炼是**简练、直接、具有冲击力**的。 例如：
+Part 2: 亮点分析
+1. ​团队能钻研，还是网红（生存能力强）
+2. ​好生意，确实有单子
+3. ​人类作为文明，到太空到火星，对天基的观察很重要
+
+**Part 3: 叙事建议 (The New Narrative)**
+这是最重要的部分。请基于你提炼出的核心亮点，为这个项目设计一个全新的、强有力的**两分钟路演叙事结构**。 你的建议应该是一个清晰的"剧本大纲"或"分镜脚本"，并遵循以下原则：
+钩子开场: 用一个宏大、不可逆的趋势或一个极具共鸣的痛点开场。
+逻辑串联: 确保每个部分（场景）都为下一个部分做铺垫，故事线清晰连贯。
+少即是多: 大胆地做减法，聚焦于讲透核心亮点，而不是罗列所有信息。 先进展，后团队: 用"我们做成了什么"来证明"我们是谁"，用硬核的进展来引出团队的独特性。
+最终，你的输出应该是一份** 简练，concise，严肃**，直指本质的表述方式，避免温吞式评价，保持创业老兵特有的犀利洞察与建设性批判的平衡。**能让创始人拿来就用、立刻改进其路演的实战手册。一定要简洁，再简洁。
+sample：
+Part 3: 叙事建议
+开场（钩子）： 未来五年，在轨卫星将翻3倍，太空“交通”拥堵不堪。现有的监测方案，如同用昂贵的奢侈品做安防。
+做什么（解决方案与进展）： 我们是镜盾科技，我们用“货架硬件+自研算法”，打造性价比高10倍的太空“天眼”。原型机已稳定运行1年，并已锁定353万设备订单。国内最大的卫星运营商都在支持我们。
+我们是谁（团队）： 我是刘博洋，一个拥有200万粉丝的天体物理博士。我的团队来自清华和中科院 ，我们是中国最懂如何看见并看懂太空的商业团队。我们不仅制造望远镜，更定义“可观测性”。 
+`,
+
+  document: "你是一位资深的商业分析师和投资顾问。请仔细分析用户提供的文档内容，从投资人角度提供专业、务实的建议。重点关注商业模式、市场机会、风险点和执行策略。你的回答要具体、可操作，避免空泛的理论。**最多200字回答**"
+};
+
+// File type detection - Modified to treat PDF as pitch deck
+function getFileType(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  if (['.ppt', '.pptx', '.pdf'].includes(ext)) return 'pitch_deck'; // Added .pdf here
+  if (['.doc', '.docx', '.txt'].includes(ext)) return 'document';
+  return 'document';
+}
+
+// Text extraction functions - Modified to parse PDF
+async function extractTextFromFile(filepath, filename) {
+  try {
+    const ext = path.extname(filename).toLowerCase();
+    
+    if (ext === '.txt') {
+      return await fs.readFile(filepath, 'utf-8');
+    }
+    
+    if (ext === '.pdf') {
+      // Parse PDF using pdf-parse
+      try {
+        const dataBuffer = await fs.readFile(filepath);
+        const pdfData = await pdf(dataBuffer);
+        return pdfData.text || `[PDF文件内容: ${filename}] - 无法提取文本内容`;
+      } catch (pdfError) {
+        console.error('Error parsing PDF:', pdfError);
+        return `[PDF文件内容: ${filename}] - PDF解析失败，请确保文件未损坏`;
+      }
+    }
+    
+    if (['.doc', '.docx', '.ppt', '.pptx'].includes(ext)) {
+      // For Office files, return placeholder
+      return `[${ext.toUpperCase()}文件内容: ${filename}] - Office文件已上传，请结合您的问题进行分析。`;
+    }
+    
+    return `[文件内容: ${filename}] - 文件已上传，请结合您的问题进行分析。`;
+  } catch (error) {
+    console.error('Error extracting text:', error);
+    return `[文件: ${filename}] - 无法读取文件内容，但文件已上传。`;
+  }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  try {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    if (!geminiApiKey) {
+      console.error("GEMINI_API_KEY is not set.");
+      return res.status(500).json({ error: 'Server configuration error.' });
+    }
+
+    // Parse form data
+    const form = formidable({
+      maxFileSize: 50 * 1024 * 1024, // 50MB limit
+      keepExtensions: true,
+      multiples: true
+    });
+
+    const [fields, files] = await form.parse(req);
+    
+    const message = Array.isArray(fields.message) ? fields.message[0] : fields.message || '';
+    const uploadedFiles = files.files ? (Array.isArray(files.files) ? files.files : [files.files]) : [];
+
+    let systemPrompt = SYSTEM_PROMPTS.default;
+    let fileContents = [];
+
+    // Process uploaded files
+    if (uploadedFiles.length > 0) {
+      const firstFileType = getFileType(uploadedFiles[0].originalFilename);
+      systemPrompt = SYSTEM_PROMPTS[firstFileType] || SYSTEM_PROMPTS.document;
+
+      for (const file of uploadedFiles) {
+        try {
+          const content = await extractTextFromFile(file.filepath, file.originalFilename);
+          fileContents.push(content);
+        } catch (error) {
+          console.error('Error processing file:', error);
+          fileContents.push(`[无法处理文件: ${file.originalFilename}]`);
+        }
+      }
+    }
+
+    // Combine prompt
+    let combinedPrompt = systemPrompt;
+    
+    if (fileContents.length > 0) {
+      combinedPrompt += `\n\n文件内容:\n${fileContents.join('\n\n')}`;
+    }
+    
+    if (message) {
+      combinedPrompt += `\n\n用户问题: ${message}`;
+    }
+
+    // Call Gemini API
+    const geminiApiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`;
+
+    const payload = {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: combinedPrompt }],
+        },
+      ],
+    };
+
+    const geminiResponse = await fetch(geminiApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const geminiData = await geminiResponse.json();
+
+    if (!geminiResponse.ok) {
+      console.error("Gemini API Error:", geminiData);
+      return res
+        .status(geminiResponse.status)
+        .json({ error: geminiData.error?.message || "AI request failed." });
+    }
+
+    const replyText =
+      geminiData.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Sorry, I couldn't generate a response.";
+
+    // Clean up uploaded files
+    for (const file of uploadedFiles) {
+      try {
+        await fs.unlink(file.filepath);
+      } catch (error) {
+        console.error('Error deleting temp file:', error);
+      }
+    }
+
+    return res.status(200).json({ reply: replyText });
+  } catch (err) {
+    console.error("Function Error:", err);
+    return res.status(500).json({ error: "An internal server error occurred." });
+  }
+}
