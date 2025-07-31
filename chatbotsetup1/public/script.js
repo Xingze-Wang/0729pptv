@@ -164,12 +164,12 @@ document.addEventListener('DOMContentLoaded', () => {
     userInput.value = '';
 
     // Typing indicator
-    const typingEl = addMessage('AI', '正在输入...', true);
+    const typingEl = addMessage('Dean', '正在输入...', true);
 
     try {
       const resp = await fetch(API_URL, { method: 'POST', body: formData });
       const data = await resp.json();
-      const modeLabel = data.role && data.role !== 'default' ? data.role : 'AI';
+      const modeLabel = data.role && data.role !== 'default' ? data.role : 'Dean';
 
       // Update and remove status
       statusEl.textContent = `${modeLabel} 模式激活中...`;
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error(err);
       typingEl.remove();
       statusEl.remove();
-      addMessage('AI', '抱歉，连接出现问题。');
+      addMessage('Dean', '抱歉，连接出现问题。');
     } finally {
       disableInputs(false);
       userInput.focus();
