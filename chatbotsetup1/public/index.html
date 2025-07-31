@@ -1,75 +1,80 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refined Chat UI</title>
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Refined Chat UI</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="chat-container">
+    <header class="chat-header">
+      <h1>MateChat</h1>
+      <!-- Expert Matching Status -->
+      <div id="expert-status" class="expert-status" style="display: none;">专家匹配中...</div>
+    </header>
 
-    <div class="chat-container">
-        <header class="chat-header">
-            <h1>MateChat</h1>
-        </header>
-
-        <div class="chat-log" id="chat-log">
-            <!-- Initial Welcome Message -->
-            <div class="chat-message">
-                <p class="message-sender ai">AI</p>
-                <div class="message-content">
-                    <p>你好，我是 AI 助手。今天有什么可以帮您？</p>
-                </div>
-            </div>
+    <div class="chat-log" id="chat-log">
+      <!-- Initial Welcome Message -->
+      <div class="chat-message">
+        <p class="message-sender ai">Dean</p>
+        <div class="message-content">
+          <p>你好，我是 AI 助手。今天有什么可以帮您？</p>
         </div>
-
-        <!-- File Upload Area (Hidden) -->
-        <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx" style="display: none;" multiple>
-        
-        <!-- File Preview Area -->
-        <div class="file-preview-area" id="file-preview-area" style="display: none;">
-            <div class="file-preview-header">
-                <span>已选择文件:</span>
-                <button type="button" id="clear-files" class="clear-files-btn">清除</button>
-            </div>
-            <div class="file-list" id="file-list"></div>
-        </div>
-
-        <!-- The input form area at the bottom -->
-        <div class="chat-input-area">
-            <form class="chat-form" id="chat-form">
-                <button type="button" class="icon-button" id="file-upload-btn" title="Upload file">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                        <polyline points="14,2 14,8 20,8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10,9 9,9 8,9"></polyline>
-                    </svg>
-                </button>
-                <textarea id="user-input" placeholder="输入消息..." rows="1" required></textarea>
-                <div class="button-container">
-                    <button type="submit" id="send-button" title="Send">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                        </svg>
-                    </button>
-                    <button type="button" id="stop-button" title="Stop generating">
-                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                            <path d="M6 6h12v12H6z"></path>
-                        </svg>
-                    </button>
-                </div>
-            </form>
-        </div>
+      </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Hidden File Input -->
+    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx" style="display: none;" multiple>
+
+    <!-- File Preview Area -->
+    <div class="file-preview-area" id="file-preview-area" style="display: none;">
+      <div class="file-preview-header">
+        <span>已选择文件:</span>
+        <button type="button" id="clear-files" class="clear-files-btn">清除</button>
+      </div>
+      <div class="file-list" id="file-list"></div>
+    </div>
+
+    <!-- Input Form -->
+    <div class="chat-input-area">
+      <form class="chat-form" id="chat-form">
+        <!-- Hidden fields for role and track (populated by script) -->
+        <input type="hidden" id="role-input" name="role" value="">
+        <input type="hidden" id="track-input" name="track" value="">
+
+        <button type="button" class="icon-button" id="file-upload-btn" title="Upload file">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+            <polyline points="14,2 14,8 20,8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10,9 9,9 8,9"></polyline>
+          </svg>
+        </button>
+
+        <textarea id="user-input" placeholder="输入消息..." rows="1" required></textarea>
+
+        <div class="button-container">
+          <button type="submit" id="send-button" title="Send">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+            </svg>
+          </button>
+          <button type="button" id="stop-button" title="Stop generating">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <path d="M6 6h12v12H6z"></path>
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
