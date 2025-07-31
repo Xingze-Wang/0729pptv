@@ -323,3 +323,9 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
 }
+
+/* Bold styling for markdown bold */
+.message-content strong {
+    font-weight: bold;
+    color: var(--text-main);
+}

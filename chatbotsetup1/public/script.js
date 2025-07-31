@@ -1,6 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[DEBUG] DOM is fully loaded. Initializing script...');
-
     const chatLog = document.getElementById('chat-log');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
@@ -11,73 +9,87 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileList = document.getElementById('file-list');
     const clearFilesBtn = document.getElementById('clear-files');
 
-    // File management
+    // 已选文件列表
     let selectedFiles = [];
-
-    // --- API 配置 ---
     const API_URL = '/api/chat';
-    console.log(`[CONFIG] API Endpoint set to: ${API_URL}`);
-    
-    // --- 文件处理函数 ---
-    
-    function getFileTypeIcon(fileName) {
-        const extension = fileName.split('.').pop().toLowerCase();
+
+    // 转义 HTML，防止注入
+    function escapeHtml(str) {
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;");
+    }
+
+    // 渲染支持 **粗体** 及换行
+    function renderMessageContent(text) {
+        const escaped = escapeHtml(text);
+        const withBold = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        return withBold.replace(/\n/g, '<br>');
+    }
+
+    // 创建单条消息元素
+    function createMessageElement(sender, message, isTyping = false) {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('chat-message');
+        if (isTyping) wrapper.classList.add('typing-indicator');
+
+        const senderEl = document.createElement('p');
+        senderEl.classList.add('message-sender');
+        if (sender === 'AI') senderEl.classList.add('ai');
+        senderEl.textContent = sender;
+
+        const contentEl = document.createElement('div');
+        contentEl.classList.add('message-content');
+        contentEl.innerHTML = `<p>${renderMessageContent(message)}</p>`;
+
+        wrapper.appendChild(senderEl);
+        wrapper.appendChild(contentEl);
+        return wrapper;
+    }
+
+    function scrollToBottom() {
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    // 添加消息到聊天记录
+    function addMessage(sender, message, isTyping = false) {
+        const el = createMessageElement(sender, message, isTyping);
+        chatLog.appendChild(el);
+        scrollToBottom();
+        return el;
+    }
+
+    // 根据文件扩展名返回对应图标（这里用 Emoji 代表）
+    function getFileTypeIcon(name) {
+        const ext = name.split('.').pop().toLowerCase();
         const icons = {
-            pdf: `<svg class="file-type-icon file-type-pdf" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                  </svg>`,
-            doc: `<svg class="file-type-icon file-type-doc" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                  </svg>`,
-            docx: `<svg class="file-type-icon file-type-doc" viewBox="0 0 24 24" fill="currentColor">
-                     <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                   </svg>`,
-            txt: `<svg class="file-type-icon file-type-txt" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                  </svg>`,
-            ppt: `<svg class="file-type-icon file-type-ppt" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                  </svg>`,
-            pptx: `<svg class="file-type-icon file-type-ppt" viewBox="0 0 24 24" fill="currentColor">
-                     <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                   </svg>`
+            pdf: '📄', doc: '📄', docx: '📄',
+            txt: '📄', ppt: '📄', pptx: '📄'
         };
-        return icons[extension] || icons.txt;
+        return icons[ext] || icons.txt;
     }
 
-    function addFileToPreview(file) {
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        fileItem.innerHTML = `
-            ${getFileTypeIcon(file.name)}
-            <span class="file-name" title="${file.name}">${file.name}</span>
-            <button type="button" class="file-remove" data-file-name="${file.name}">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                </svg>
-            </button>
-        `;
-        
-        fileList.appendChild(fileItem);
-        
-        // Add remove functionality
-        const removeBtn = fileItem.querySelector('.file-remove');
-        removeBtn.addEventListener('click', () => {
-            removeFile(file.name);
-        });
-    }
-
-    function removeFile(fileName) {
-        selectedFiles = selectedFiles.filter(file => file.name !== fileName);
-        updateFilePreview();
-    }
-
+    // 更新文件预览区
     function updateFilePreview() {
         fileList.innerHTML = '';
-        
-        if (selectedFiles.length > 0) {
+        if (selectedFiles.length) {
             filePreviewArea.style.display = 'block';
-            selectedFiles.forEach(file => addFileToPreview(file));
+            selectedFiles.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    ${getFileTypeIcon(f.name)}
+                    <span class="file-name" title="${f.name}">${f.name}</span>
+                    <button class="file-remove" data-name="${f.name}">×</button>
+                `;
+                item.querySelector('.file-remove').onclick = () => {
+                    selectedFiles = selectedFiles.filter(x => x.name !== f.name);
+                    updateFilePreview();
+                };
+                fileList.appendChild(item);
+            });
             fileUploadBtn.classList.add('active');
         } else {
             filePreviewArea.style.display = 'none';
@@ -85,189 +97,103 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 事件监听器 ---
-
-    // 文件上传按钮
-    fileUploadBtn.addEventListener('click', () => {
-        fileInput.click();
-    });
-
-    // 文件选择
-    fileInput.addEventListener('change', (event) => {
-        const files = Array.from(event.target.files);
-        
-        // 添加新文件到现有列表
-        files.forEach(file => {
-            // 检查是否已存在同名文件
-            if (!selectedFiles.some(existingFile => existingFile.name === file.name)) {
-                selectedFiles.push(file);
+    // 绑定文件上传按钮
+    fileUploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = e => {
+        Array.from(e.target.files).forEach(f => {
+            if (!selectedFiles.some(x => x.name === f.name)) {
+                selectedFiles.push(f);
             }
         });
-        
         updateFilePreview();
-        
-        // 重置input，允许重复选择相同文件
         fileInput.value = '';
-    });
-
-    // 清除所有文件
-    clearFilesBtn.addEventListener('click', () => {
+    };
+    clearFilesBtn.onclick = () => {
         selectedFiles = [];
         updateFilePreview();
-    });
+    };
 
-    // 拖拽文件支持
-    chatForm.addEventListener('dragover', (e) => {
+    // 拖拽上传支持
+    chatForm.addEventListener('dragover', e => {
         e.preventDefault();
         chatForm.style.backgroundColor = '#f0f0f0';
     });
-
-    chatForm.addEventListener('dragleave', (e) => {
+    chatForm.addEventListener('dragleave', e => {
         e.preventDefault();
         chatForm.style.backgroundColor = '';
     });
-
-    chatForm.addEventListener('drop', (e) => {
+    chatForm.addEventListener('drop', e => {
         e.preventDefault();
         chatForm.style.backgroundColor = '';
-        
         const files = Array.from(e.dataTransfer.files);
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
-        
-        files.forEach(file => {
-            const extension = '.' + file.name.split('.').pop().toLowerCase();
-            if (allowedTypes.includes(extension)) {
-                if (!selectedFiles.some(existingFile => existingFile.name === file.name)) {
-                    selectedFiles.push(file);
-                }
+        const allowed = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
+        files.forEach(f => {
+            const ext = '.' + f.name.split('.').pop().toLowerCase();
+            if (allowed.includes(ext) && !selectedFiles.some(x => x.name === f.name)) {
+                selectedFiles.push(f);
             }
         });
-        
         updateFilePreview();
     });
 
-    // 键盘事件 - 回车发送
-    userInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
+    // 回车发送（Shift+Enter 换行）
+    userInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             sendButton.click();
         }
     });
 
-    // 表单提交事件
-    chatForm.addEventListener('submit', async (event) => {
-        console.log('[EVENT] Form submitted.');
-        event.preventDefault();
-        
-        const userMessage = userInput.value.trim();
-        if (userMessage === '' && selectedFiles.length === 0) return;
+    // 提交表单并清理预览
+    chatForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const text = userInput.value.trim();
+        if (!text && !selectedFiles.length) return;
 
-        // 显示用户消息
-        if (userMessage) {
-            addMessage('You', userMessage);
+        // 缓存将要发送的文件
+        const filesToSend = selectedFiles.slice();
+
+        // 禁用用户输入
+        userInput.disabled = sendButton.disabled = fileUploadBtn.disabled
+            = clearFilesBtn.disabled = fileInput.disabled = true;
+
+        // 合并文字与文件列表于同一气泡
+        let combined = text;
+        if (filesToSend.length) {
+            const names = filesToSend.map(f => f.name).join(', ');
+            combined += `\n\n📎 上传文件: ${names}`;
         }
-        
-        // 显示文件信息
-        if (selectedFiles.length > 0) {
-            const fileNames = selectedFiles.map(f => f.name).join(', ');
-            addMessage('You', `📎 上传文件: ${fileNames}`, true);
-        }
+        addMessage('You', combined);
+
+        // 构建 FormData
+        const form = new FormData();
+        form.append('message', text);
+        filesToSend.forEach(f => form.append('files', f));
+
+        // 立即清空预览
+        selectedFiles = [];
+        updateFilePreview();
+        fileInput.value = '';
 
         userInput.value = '';
         userInput.style.height = 'auto';
 
-        const typingIndicator = addTypingIndicator();
+        const typingEl = addMessage('AI', '正在输入...', true);
 
         try {
-            const aiResponse = await sendMessageWithFiles(userMessage, selectedFiles);
-            typingIndicator.remove();
-            addMessage('AI', aiResponse);
-        } catch (error) {
-            typingIndicator.remove();
-            console.error('[CRITICAL ERROR] Failed to get AI response. Full error object:', error);
-            addMessage('AI', '抱歉，连接时出现问题。(详情请查看控制台)');
+            const resp = await fetch(API_URL, { method: 'POST', body: form });
+            const data = await resp.json();
+            typingEl.remove();
+            addMessage('AI', data.reply);
+        } catch (err) {
+            typingEl.remove();
+            addMessage('AI', '抱歉，连接出现问题。');
+            console.error(err);
+        } finally {
+            // 恢复用户输入
+            userInput.disabled = sendButton.disabled = fileUploadBtn.disabled
+                = clearFilesBtn.disabled = fileInput.disabled = false;
+            userInput.focus();
         }
-
-        // 清除文件选择
-        selectedFiles = [];
-        updateFilePreview();
     });
-    
-    // --- 核心功能函数 ---
-
-    async function sendMessageWithFiles(message, files) {
-        const formData = new FormData();
-        formData.append('message', message);
-        
-        // 添加文件
-        files.forEach(file => {
-            formData.append('files', file);
-        });
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'The server returned an error.');
-            }
-
-            const data = await response.json();
-            return data.reply;
-
-        } catch (error) {
-            console.error('Error sending message with files:', error);
-            return "Sorry, I'm having trouble connecting to the server.";
-        }
-    }
-
-    // --- UI 辅助函数 ---
-
-    function addMessage(sender, message, isFileMessage = false) {
-        const messageElement = createMessageElement(sender, message, false, isFileMessage);
-        chatLog.appendChild(messageElement);
-        scrollToBottom();
-    }
-    
-    function addTypingIndicator() {
-        const indicatorElement = createMessageElement('AI', '正在输入...', true);
-        chatLog.appendChild(indicatorElement);
-        scrollToBottom();
-        return indicatorElement;
-    }
-
-    function createMessageElement(sender, message, isTyping = false, isFileMessage = false) {
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('chat-message');
-        if (isTyping) {
-            messageElement.classList.add('typing-indicator');
-        }
-        
-        const senderElement = document.createElement('p');
-        senderElement.classList.add('message-sender');
-        if (sender === 'AI') {
-            senderElement.classList.add('ai');
-        }
-        senderElement.textContent = sender;
-        
-        const contentElement = document.createElement('div');
-        contentElement.classList.add('message-content');
-        
-        if (isFileMessage) {
-            contentElement.innerHTML = `<p style="color: #666; font-style: italic;">${message}</p>`;
-        } else {
-            contentElement.innerHTML = `<p>${message.replace(/\n/g, '<br>')}</p>`;
-        }
-        
-        messageElement.appendChild(senderElement);
-        messageElement.appendChild(contentElement);
-        return messageElement;
-    }
-
-    function scrollToBottom() {
-        chatLog.scrollTop = chatLog.scrollHeight;
-    }
 });
