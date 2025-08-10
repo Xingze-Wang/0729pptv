@@ -194,7 +194,7 @@ export default async function handler(req, res) {
       }]
     };
     const chatRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-Pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
